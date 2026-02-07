@@ -17,8 +17,8 @@ const Valentine = () => {
   const [hintVisible, setHintVisible] = useState(false);
   const containerRef = useRef(null);
   const moveCount = useRef(0);
+  const noButtonRef = useRef(null); // Ref to measure actual button size
 
-  /* FIX 1: Memoize sadTexts to avoid dependency warning */
   const sadTexts = useMemo(
     () => [
       "No 😢",
@@ -35,36 +35,51 @@ const Valentine = () => {
     []
   );
 
-  /* FIX 2: Add sadTexts to dependency array */
-  const moveNoButton = useCallback(() => {
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-    const buttonWidth = 160;
-    const buttonHeight = 55;
+  const moveNoButton = useCallback(
+    (e) => {
+      // Get actual button dimensions from the DOM element
+      const btn = e?.currentTarget || noButtonRef.current;
+      const rect = btn?.getBoundingClientRect();
 
-    const maxX = viewportWidth - buttonWidth - 20;
-    const maxY = viewportHeight - buttonHeight - 20;
+      // Use actual rendered size with fallbacks
+      const buttonWidth = rect?.width || 140;
+      const buttonHeight = rect?.height || 50;
 
-    const randomX = Math.floor(Math.random() * maxX);
-    const randomY = Math.floor(Math.random() * maxY);
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
 
-    setNoPos({ x: randomX, y: randomY });
-    setIsMoved(true);
+      // Safety padding to keep button fully visible
+      const padding = 16;
 
-    moveCount.current += 1;
-    setYesScale(1 + moveCount.current * 0.15);
-    setNoText(sadTexts[moveCount.current % sadTexts.length]);
+      // Calculate safe bounds (accounting for growing text)
+      const maxX = Math.max(padding, viewportWidth - buttonWidth - padding);
+      const maxY = Math.max(padding, viewportHeight - buttonHeight - padding);
+      const minX = padding;
+      const minY = padding;
 
-    if (moveCount.current > 3) {
-      setHintVisible(true);
-    }
-  }, [sadTexts]);
+      // Generate random position within safe bounds
+      const randomX = Math.floor(Math.random() * (maxX - minX)) + minX;
+      const randomY = Math.floor(Math.random() * (maxY - minY)) + minY;
 
-  const handleYesClick = () => {
+      setNoPos({ x: randomX, y: randomY });
+      setIsMoved(true);
+
+      moveCount.current += 1;
+      setYesScale(1 + moveCount.current * 0.15);
+      setNoText(sadTexts[moveCount.current % sadTexts.length]);
+
+      if (moveCount.current > 3) {
+        setHintVisible(true);
+      }
+    },
+    [sadTexts]
+  );
+
+  const handleYesClick = useCallback(() => {
     setAccepted(true);
-  };
+  }, []);
 
-  /* FIX 3: Memoize background hearts to prevent regeneration */
+  /* Memoize background hearts to prevent regeneration */
   const backgroundHearts = useMemo(
     () =>
       [...Array(25)].map((_, i) => ({
@@ -101,7 +116,6 @@ const Valentine = () => {
     return () => clearInterval(interval);
   }, [accepted]);
 
-  /* ======================== YES PAGE ======================== */
   if (accepted) {
     return (
       <div className={valStyles.yesContainer}>
@@ -136,7 +150,6 @@ const Valentine = () => {
     );
   }
 
-  /* ===================== QUESTION PAGE ===================== */
   return (
     <div className={valStyles.container} ref={containerRef}>
       {/* Floating Hearts Background */}
@@ -194,7 +207,16 @@ const Valentine = () => {
           <button
             className={valStyles.yesButton}
             onClick={handleYesClick}
-            style={{ transform: `scale(${yesScale})` }}
+            onTouchEnd={(e) => {
+              // Handle touch immediately without mouse delay
+              e.preventDefault();
+              handleYesClick();
+            }}
+            style={{
+              transform: `scale(${yesScale})`,
+              position: "relative",
+              zIndex: 100, // Higher than No button to ensure it's always clickable
+            }}
           >
             Yes! 💖
           </button>
@@ -203,7 +225,11 @@ const Valentine = () => {
             <button
               className={valStyles.noButton}
               onMouseEnter={moveNoButton}
-              onTouchStart={moveNoButton}
+              onTouchStart={(e) => {
+                e.preventDefault(); // Prevent scroll
+                moveNoButton(e);
+              }}
+              ref={noButtonRef}
             >
               {noText}
             </button>
@@ -217,18 +243,23 @@ const Valentine = () => {
         )}
       </div>
 
-      {/* Runaway No button */}
+      {/* Runaway No button - Fixed position */}
       {isMoved && (
         <button
+          ref={noButtonRef}
           className={`${valStyles.noButton} ${valStyles.noButtonMoved}`}
           onMouseEnter={moveNoButton}
-          onTouchStart={moveNoButton}
+          onTouchStart={(e) => {
+            e.preventDefault();
+            moveNoButton(e);
+          }}
           style={{
             position: "fixed",
             left: `${noPos.x}px`,
             top: `${noPos.y}px`,
-            zIndex: 9999,
+            zIndex: 50, // Lower than Yes button so Yes is always accessible
             margin: 0,
+            touchAction: "none", // Prevent scrolling when trying to tap
           }}
         >
           {noText}
