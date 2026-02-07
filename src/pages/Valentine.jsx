@@ -1,4 +1,10 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, {
+  useState,
+  useRef,
+  useCallback,
+  useEffect,
+  useMemo,
+} from "react";
 import valStyles from "../pages/Valentine.module.css";
 
 const Valentine = () => {
@@ -8,22 +14,28 @@ const Valentine = () => {
   const [noText, setNoText] = useState("No 😢");
   const [yesScale, setYesScale] = useState(1);
   const [hearts, setHearts] = useState([]);
+  const [hintVisible, setHintVisible] = useState(false);
   const containerRef = useRef(null);
   const moveCount = useRef(0);
 
-  const sadTexts = [
-    "No 😢",
-    "Are you sure? 🥺",
-    "Really?! 💔",
-    "Think again! 😭",
-    "Please? 🥹",
-    "Don't do this! 😿",
-    "I'll cry! 😩",
-    "Pretty please? 🌹",
-    "Reconsider! 💕",
-    "You're breaking my heart! 😫",
-  ];
+  /* FIX 1: Memoize sadTexts to avoid dependency warning */
+  const sadTexts = useMemo(
+    () => [
+      "No 😢",
+      "Are you sure? 🥺",
+      "Really?! 💔",
+      "Think again! 😭",
+      "Please? 🥹",
+      "Don't do this! 😿",
+      "I'll cry! 😩",
+      "Pretty please? 🌹",
+      "Reconsider! 💕",
+      "You're breaking my heart! 😫",
+    ],
+    []
+  );
 
+  /* FIX 2: Add sadTexts to dependency array */
   const moveNoButton = useCallback(() => {
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
@@ -42,13 +54,34 @@ const Valentine = () => {
     moveCount.current += 1;
     setYesScale(1 + moveCount.current * 0.15);
     setNoText(sadTexts[moveCount.current % sadTexts.length]);
+
+    if (moveCount.current > 3) {
+      setHintVisible(true);
+    }
   }, [sadTexts]);
 
   const handleYesClick = () => {
     setAccepted(true);
   };
 
-  /* ---------- Celebration hearts (only after YES) ---------- */
+  /* FIX 3: Memoize background hearts to prevent regeneration */
+  const backgroundHearts = useMemo(
+    () =>
+      [...Array(25)].map((_, i) => ({
+        id: i,
+        left: `${Math.random() * 100}%`,
+        animationDelay: `${Math.random() * 5}s`,
+        animationDuration: `${3 + Math.random() * 4}s`,
+        fontSize: `${14 + Math.random() * 24}px`,
+        opacity: 0.4 + Math.random() * 0.5,
+        emoji: ["❤️", "💕", "💖", "💗", "💓", "🌹", "💘"][
+          Math.floor(Math.random() * 7)
+        ],
+      })),
+    []
+  );
+
+  /* Celebration hearts */
   useEffect(() => {
     if (!accepted) return;
     const interval = setInterval(() => {
@@ -108,23 +141,19 @@ const Valentine = () => {
     <div className={valStyles.container} ref={containerRef}>
       {/* Floating Hearts Background */}
       <div className={valStyles.heartsBackground}>
-        {[...Array(25)].map((_, i) => (
+        {backgroundHearts.map((heart) => (
           <span
-            key={i}
+            key={heart.id}
             className={valStyles.floatingHeart}
             style={{
-              left: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 5}s`,
-              animationDuration: `${3 + Math.random() * 4}s`,
-              fontSize: `${14 + Math.random() * 24}px`,
-              opacity: 0.4 + Math.random() * 0.5,
+              left: heart.left,
+              animationDelay: heart.animationDelay,
+              animationDuration: heart.animationDuration,
+              fontSize: heart.fontSize,
+              opacity: heart.opacity,
             }}
           >
-            {
-              ["❤️", "💕", "💖", "💗", "💓", "🌹", "💘"][
-                Math.floor(Math.random() * 7)
-              ]
-            }
+            {heart.emoji}
           </span>
         ))}
       </div>
@@ -181,14 +210,14 @@ const Valentine = () => {
           )}
         </div>
 
-        {moveCount.current > 3 && (
+        {hintVisible && (
           <p className={valStyles.hintText}>
             Psst... just click Yes already! 😏💘
           </p>
         )}
       </div>
 
-      {/* Runaway No button (fixed position after first move) */}
+      {/* Runaway No button */}
       {isMoved && (
         <button
           className={`${valStyles.noButton} ${valStyles.noButtonMoved}`}
@@ -206,7 +235,6 @@ const Valentine = () => {
         </button>
       )}
 
-      {/* Bottom decoration */}
       <div className={valStyles.bottomDecor}>Made with ❤️ for you</div>
     </div>
   );
