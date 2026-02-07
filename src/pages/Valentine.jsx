@@ -42,7 +42,7 @@ const Valentine = () => {
     moveCount.current += 1;
     setYesScale(1 + moveCount.current * 0.15);
     setNoText(sadTexts[moveCount.current % sadTexts.length]);
-  }, []);
+  }, [sadTexts]);
 
   const handleYesClick = () => {
     setAccepted(true);
